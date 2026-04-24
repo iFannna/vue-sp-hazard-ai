@@ -11,7 +11,9 @@
     <div class="card">
       <div class="toolbar">
         <h3>识别任务趋势</h3>
-        <RouterLink class="btn btn-light" to="/stats">查看分析</RouterLink>
+        <RouterLink v-slot="{ navigate }" to="/stats" custom>
+          <el-button @click="navigate">查看分析</el-button>
+        </RouterLink>
       </div>
       <div style="color: #6b7280">近 7 日任务量与复核量趋势</div>
       <div class="chart-bars">
@@ -42,7 +44,7 @@
       <div class="info-list">
         <div v-for="item in systemStatus" :key="item.label" class="info-row">
           <span>{{ item.label }}</span>
-          <span class="tag" :class="item.tagClass">{{ item.value }}</span>
+          <el-tag :type="item.tagType">{{ item.value }}</el-tag>
         </div>
       </div>
     </div>
@@ -53,8 +55,12 @@
       <div class="toolbar">
         <h3>快捷入口</h3>
         <div>
-          <RouterLink to="/recognition" class="btn btn-primary">进入识别</RouterLink>
-          <RouterLink to="/collection" class="btn btn-light">采集管理</RouterLink>
+          <RouterLink v-slot="{ navigate }" to="/recognition" custom>
+            <el-button type="primary" @click="navigate">进入识别</el-button>
+          </RouterLink>
+          <RouterLink v-slot="{ navigate }" to="/collection" custom>
+            <el-button @click="navigate">采集管理</el-button>
+          </RouterLink>
         </div>
       </div>
       <div class="kpi-row">
@@ -67,59 +73,54 @@
 
     <div class="card">
       <h3>最新任务动态</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>任务编号</th>
-            <th>类型</th>
-            <th>状态</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="task in tasks" :key="task.code">
-            <td>{{ task.code }}</td>
-            <td>{{ task.type }}</td>
-            <td><span class="tag" :class="task.tagClass">{{ task.status }}</span></td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table :data="latestTasks">
+        <el-table-column prop="code" label="任务编号" min-width="150" />
+        <el-table-column prop="type" label="类型" min-width="120" />
+        <el-table-column label="状态" width="110">
+          <template #default="{ row: task }">
+            <el-tag :type="task.tagType">{{ task.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="暂无任务动态" />
+        </template>
+      </el-table>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue';
 import { RouterLink } from 'vue-router';
+import { ElMessage } from 'element-plus';
 
-const metrics = [
-  { label: '累计采集样本', value: '12,846', trend: '较上周 +12.8%' },
-  { label: '今日识别任务', value: '286', trend: '成功率 98.6%' },
-  { label: '待人工复核', value: '37', trend: '高优先级 12 条' },
-  { label: '隐患类型覆盖', value: '31', trend: '静态 20+ · 动态 10+' },
-];
+import { getDashboardSummary, type DashboardSummaryVO } from '@/api/dashboard';
 
-const chartData = [
-  { label: '周一', height: '90px', color: '#93c5fd' },
-  { label: '周二', height: '130px', color: '#60a5fa' },
-  { label: '周三', height: '110px', color: '#93c5fd' },
-  { label: '周四', height: '160px', color: '#3b82f6' },
-  { label: '周五', height: '185px', color: '#2563eb' },
-  { label: '周六', height: '145px', color: '#60a5fa' },
-  { label: '周日', height: '170px', color: '#3b82f6' },
-];
+const summary = ref<DashboardSummaryVO>(createEmptySummary());
 
-const hazardDistribution = [
-  { label: '未戴安全帽', percent: '28%', width: '82%', color: '#2563eb' },
-  { label: '消防通道堵塞', percent: '21%', width: '68%', color: '#f59e0b' },
-  { label: '物料堆放混乱', percent: '16%', width: '54%', color: '#10b981' },
-];
+const metrics = computed(() => summary.value.metrics);
 
-const systemStatus = [
-  { label: '模型服务', value: '运行正常', tagClass: 'tag-low' },
-  { label: 'MySQL 数据库', value: '连接正常', tagClass: 'tag-low' },
-  { label: 'Redis 缓存', value: '命中率 92%', tagClass: 'tag-low' },
-  { label: '对象存储', value: '剩余 1.8 TB', tagClass: 'tag-blue' },
-  { label: '平台对接', value: '待联调', tagClass: 'tag-medium' },
-];
+const chartData = computed(() => {
+  const groups = summary.value.taskStatus;
+  const maxCount = Math.max(...groups.map((item) => item.count), 1);
+  return groups.map((item) => ({
+    label: item.label,
+    height: `${Math.max(Math.round((item.count / maxCount) * 180), 20)}px`,
+    color: item.color,
+  }));
+});
+
+const hazardDistribution = computed(() => summary.value.hazardDistribution);
+const systemStatus = computed(() => summary.value.systemStatus);
+const latestTasks = computed(() => summary.value.latestTasks);
+
+onMounted(async () => {
+  try {
+    summary.value = await getDashboardSummary();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '首页数据加载失败');
+  }
+});
 
 const quickEntries = [
   { title: '图片识别', description: '上传图片并查看结构化识别结果', path: '/recognition' },
@@ -127,9 +128,25 @@ const quickEntries = [
   { title: '数据集管理', description: '查看训练 / 验证 / 测试集分布', path: '/dataset' },
 ];
 
-const tasks = [
-  { code: 'TASK-20260316-0001', type: '单图识别', status: '已完成', tagClass: 'tag-low' },
-  { code: 'TASK-20260316-0002', type: '批量导入', status: '处理中', tagClass: 'tag-medium' },
-  { code: 'TASK-20260316-0003', type: '人工复核', status: '已驳回', tagClass: 'tag-blue' },
-];
+function createEmptySummary(): DashboardSummaryVO {
+  return {
+    metrics: [
+      { label: '采集批次', value: '0', trend: '样本 0 条' },
+      { label: '今日识别任务', value: '0', trend: '累计任务 0 条' },
+      { label: '待人工复核', value: '0', trend: '总复核 0 条' },
+      { label: '数据集样本', value: '0', trend: '隐患类型 0 类' },
+    ],
+    taskStatus: [],
+    hazardDistribution: [],
+    systemStatus: [
+      { label: '后端服务', value: '运行中', tagType: 'warning' },
+      { label: '模型服务', value: '服务可用', tagType: 'primary' },
+      { label: 'MySQL 数据库', value: '连接中', tagType: 'warning' },
+      { label: 'Redis 缓存', value: '按需启用', tagType: 'warning' },
+      { label: '对象存储', value: '连接中', tagType: 'warning' },
+      { label: '平台对接', value: '准备中', tagType: 'warning' },
+    ],
+    latestTasks: [],
+  };
+}
 </script>

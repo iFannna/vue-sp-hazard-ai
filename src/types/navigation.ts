@@ -1,7 +1,8 @@
-﻿export interface NavItem {
+export interface NavItem {
   label: string;
   name: string;
   path: string;
+  permission?: string;
 }
 
 export interface NavGroup {
@@ -12,4 +13,5 @@ export interface NavGroup {
 export interface AppRouteMeta {
   title: string;
   subtitle?: string;
+  permission?: string;
 }

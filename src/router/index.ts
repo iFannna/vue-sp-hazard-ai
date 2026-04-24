@@ -1,5 +1,6 @@
-﻿import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHistory } from 'vue-router';
 
+import { getDefaultRouteName, hasPermission, isLoggedIn } from '@/utils/session';
 import { routes } from './routes';
 
 const router = createRouter({
@@ -8,6 +9,25 @@ const router = createRouter({
   scrollBehavior() {
     return { top: 0 };
   },
+});
+
+router.beforeEach((to) => {
+  if (to.name !== 'login' && !isLoggedIn()) {
+    return { name: 'login' };
+  }
+  if (to.name === 'login' && isLoggedIn()) {
+    return { name: getDefaultRouteName() };
+  }
+
+  const permission = typeof to.meta.permission === 'string' ? to.meta.permission : undefined;
+  if (to.name !== 'login' && permission && !hasPermission(permission)) {
+    const defaultRouteName = getDefaultRouteName();
+    if (defaultRouteName !== 'login' && to.name !== defaultRouteName) {
+      return { name: defaultRouteName };
+    }
+    return false;
+  }
+  return true;
 });
 
 router.afterEach((to) => {

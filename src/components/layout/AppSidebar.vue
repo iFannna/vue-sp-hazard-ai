@@ -2,7 +2,7 @@
   <aside class="sidebar">
     <div class="logo">
       安全生产隐患 AI 平台
-      <small>多页面静态原型 · Vue3 Demo</small>
+      <small>隐患识别与复核工作台</small>
     </div>
     <div v-for="group in groups" :key="group.title">
       <div class="nav-title">{{ group.title }}</div>

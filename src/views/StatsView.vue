@@ -11,26 +11,17 @@
     <div class="card">
       <div class="toolbar">
         <h3>高频隐患排行</h3>
-        <button class="btn btn-light">导出</button>
+        <el-button @click="exportRanking">导出</el-button>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>排名</th>
-            <th>隐患类型</th>
-            <th>数量</th>
-            <th>占比</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="item in ranking" :key="item.rank">
-            <td>{{ item.rank }}</td>
-            <td>{{ item.name }}</td>
-            <td>{{ item.count }}</td>
-            <td>{{ item.percent }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table :data="ranking">
+        <el-table-column prop="rank" label="排名" width="80" />
+        <el-table-column prop="name" label="隐患类型" min-width="150" />
+        <el-table-column prop="count" label="数量" width="90" />
+        <el-table-column prop="percent" label="占比" width="90" />
+        <template #empty>
+          <el-empty description="暂无排行数据" />
+        </template>
+      </el-table>
     </div>
 
     <div class="card">
@@ -51,22 +42,44 @@
 </template>
 
 <script setup lang="ts">
-const metrics = [
-  { label: '识别通过率', value: '93.4%', trend: '人工复核后统计' },
-  { label: '误报率', value: '4.1%', trend: '近 7 日' },
-  { label: '漏报率', value: '2.5%', trend: '持续优化中' },
-  { label: '平均识别耗时', value: '1.82s', trend: '单图任务' },
-];
+import { computed, onMounted, ref } from 'vue';
+import { ElMessage } from 'element-plus';
 
-const ranking = [
-  { rank: '1', name: '未戴安全帽', count: '1,846', percent: '28%' },
-  { rank: '2', name: '消防通道堵塞', count: '1,392', percent: '21%' },
-  { rank: '3', name: '物料堆放混乱', count: '1,061', percent: '16%' },
-];
+import { getStatsSummary, type StatsSummaryVO } from '@/api/stats';
 
-const areas = [
-  { label: '施工现场', risk: '高风险', width: '86%', color: '#ef4444' },
-  { label: '工业厂区', risk: '中风险', width: '64%', color: '#f59e0b' },
-  { label: '仓储区域', risk: '一般', width: '42%', color: '#10b981' },
-];
+const summary = ref<StatsSummaryVO>({
+  metrics: [
+    { label: '识别通过率', value: '0%', trend: '人工复核后统计' },
+    { label: '误报率', value: '0%', trend: '已驳回复核占比' },
+    { label: '待处理任务', value: '0', trend: '总任务 0 条' },
+    { label: '已入库素材', value: '0', trend: '隐患类型 0 类' },
+  ],
+  ranking: [],
+  regionRisks: [],
+});
+
+onMounted(async () => {
+  try {
+    summary.value = await getStatsSummary();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '统计数据加载失败');
+  }
+});
+
+const metrics = computed(() => summary.value.metrics);
+const ranking = computed(() => summary.value.ranking);
+const areas = computed(() => summary.value.regionRisks);
+
+function exportRanking() {
+  const header = '排名,隐患类型,数量,占比';
+  const rows = ranking.value.map((item) => [item.rank, item.name, item.count, item.percent].join(','));
+  const blob = new Blob([`\uFEFF${[header, ...rows].join('\n')}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'hazard-ranking.csv';
+  link.click();
+  URL.revokeObjectURL(url);
+  ElMessage.success('高频隐患排行已导出');
+}
 </script>

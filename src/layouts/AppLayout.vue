@@ -1,11 +1,10 @@
 ﻿<template>
   <div class="app">
-    <AppSidebar :groups="navigationGroups" />
+    <AppSidebar :groups="filteredNavigationGroups" />
     <main class="main">
       <AppHeader :title="pageMeta.title" :subtitle="pageMeta.subtitle" />
       <div class="content">
         <RouterView />
-        <PageFooterNote />
       </div>
     </main>
   </div>
@@ -15,11 +14,11 @@
 import { computed } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
 
-import PageFooterNote from '@/components/PageFooterNote.vue';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import { navigationGroups } from '@/config/navigation';
 import type { AppRouteMeta } from '@/types/navigation';
+import { hasPermission } from '@/utils/session';
 
 const route = useRoute();
 
@@ -31,4 +30,11 @@ const pageMeta = computed<AppRouteMeta>(() => {
     subtitle: meta.subtitle,
   };
 });
+
+const filteredNavigationGroups = computed(() => navigationGroups
+  .map((group) => ({
+    ...group,
+    items: group.items.filter((item) => hasPermission(item.permission)),
+  }))
+  .filter((group) => group.items.length > 0));
 </script>
